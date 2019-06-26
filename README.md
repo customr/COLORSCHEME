@@ -6,7 +6,7 @@ This is my project for community group [COLORSCHEME](https://vk.com/nnovosch).
 It was created to increase my level of Python knowledge and maybe for inspiration of designers.
 ![alt text](https://pp.userapi.com/c851016/v851016853/14bf64/yHpg_6TkXnc.jpg)
 
-##How it works
+## How it works
 
 * Image fed to input
 * Quantization happens (decrease quantity of colors)
