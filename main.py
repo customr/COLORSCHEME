@@ -4,10 +4,34 @@ from cv2 import kmeans, KMEANS_RANDOM_CENTERS, TERM_CRITERIA_EPS, TERM_CRITERIA_
 from PIL import Image
 from io import BytesIO
 
-#TODO: make docstrings
 
 class Picture:
+    """A picture object
+    Inputs image and makes a new image with color data on it.
+    
+    How it works:
+        1. Posterized image (with decreased colors range) fed to KMeans alghoritm
+        2. from KMeans we receiving most interesting colors
+        3. from this array taking k-colors and making a histogram
 
+    Args:
+        image_b (bytes): image in bytesIO representation
+        k (int): count of colors
+    
+    Constants:
+        PAD (bool): if True, makes white border on image, otherwise nothing
+        MIN_H (int): minimal image height
+        MIN_W (int): minimal image width
+
+    Attributes:
+        image (numpy.ndarray): sourse image
+        image_posterized (numpy.ndarray): image with quantizated colors (decreased colors range)
+        image_pil (PIL.Image): image in PIL representation
+        label (numpy.ndarray): Picture.center counts
+        center (numpy.ndarray): most wanted colors in RGB representation
+        hist (numpy.ndarray): histogram of k most wanted colors
+    
+    """
     PAD = True
     MIN_W = 1000
     MIN_H = 1000
@@ -16,21 +40,30 @@ class Picture:
         self.image_pil = Image.open(BytesIO(image_b))
         self.image = np.array(self.image_pil)
         self.k = k
-        self.brightness = 0
-        self.contrast = 0
 
+        #if image is less than minimal width and height
         if (self.image.shape[0] < self.MIN_W) or (self.image.shape[1] < self.MIN_H):
 
+            #choose maximal proportion (where side less than minimal)
             p = max(self.MIN_W / self.image.shape[0], 
                     self.MIN_H / self.image.shape[1])
 
+            #increase both sides by proportional multiplication
             self.image_pil = self.image_pil.resize((int(p*self.image.shape[1]), int(p*self.image.shape[0])), Image.LANCZOS)
             self.image = np.array(self.image_pil)
 
+        #quantization - decrease colors range
         self.image_posterized = self.image_pil.quantize((self.k//2)*self.k**2, 1)
         self.image_posterized = self.image_posterized.convert("RGB", palette=Image.ADAPTIVE, colors=self.k**3)
         self.image_posterized = np.array(self.image_posterized)
 
+        """
+        KMeans:
+            1. create random centers of colors (centroids)
+            2. for each color assign nearest centroid (calculates as Euclidian distance)
+            3. move centroid to their new position (mean of assigned colors)
+            4. repeat stepts 2 and 3 until sum of distances is minimal
+        """
         _, self.label, self.center = kmeans(
                     self.image_posterized.reshape(-1, 3).astype('float32'), 
                     self.k, 
@@ -54,19 +87,41 @@ class Picture:
 
     #picture to the left of the form
     def __add__(self, form):
+        assert isinstance(form, Form), 'Should be From object'
         return form.__radd__(self)
     
     #picture over the form
     def __radd__(self, form):
+        assert isinstance(form, Form), 'Should be From object'
         return form.__add__(self)
 
 
 class Form:
+    """A form object
+    Only for work with Picture
+
+    Args:
+        flag (bool): for ultra wide (0) or ultra tall (1)
+        **params:
+            w,h, r,c, an1,an2, bb, loc - better you don't touch this, because there is no meaning :)
+
+    """
     def __init__(self, flag, **params):
         self.flag = flag
         self.params = params
 
     def create_form(self, image, colors, hist):
+        """Create form and insert image into it
+        
+        Args:
+            image (Image): image to insert into form
+            colors (numpy.ndarray): Picture.center
+            hist (numpy.ndarray): Picture.hist
+
+        Returns:
+            PIL.Image - form with a picture
+
+        """
         fig = plt.figure()
         fig.set_size_inches(self.params['w'], self.params['h'])
 
@@ -91,6 +146,8 @@ class Form:
 
     #picture to the left of the form
     def __radd__(self, pic):
+        assert isinstance(pic, Picture), 'Should be Picture object'
+
         self.figure = self.create_form(
             pic.image_posterized, 
             pic.center, 
@@ -107,6 +164,8 @@ class Form:
     
     #picture over the form
     def __add__(self, pic):
+        assert isinstance(pic, Picture), 'Should be Picture object'
+
         self.figure = self.create_form(
             pic.image_posterized, 
             pic.center, 
@@ -121,29 +180,31 @@ class Form:
 
         return Image.fromarray(np.vstack((np.asarray(pic.image_pil), np.asarray(self.figure))))
 
-class vegnn:
-    def __init__(self, imgb, need_data=False):
-        self.image = Picture(imgb)
-        self.result = []
+def vegnn(imgb):
+    """Mediator between Form and Picture
 
-        if (self.image.image_pil.width-self.image.image_pil.height) > (self.image.image_pil.width+self.image.image_pil.height)/10: 
-            form = Form(flag=0, w=50, h=15, r=1, c=2, an1='C', an2='W', bb=(1,0,-0.5,1), loc="center left")
-            self.ans = form + self.image
-        else: 
-            form = Form(flag=1, w=15, h=50, r=2, c=1, an1='S', an2='N', bb=(0.5,1), loc='lower center')
-            self.ans = self.image + form
+    Args:
+        imgb (bytes): image in bytes
 
-        with BytesIO() as output:
-            self.ans.save(output, 'BMP')
-            self.result = output.getvalue()
+    Returns:
+        result - image in bytes
+    
+    """
+    image = Picture(imgb)
+    result = None
 
-        if need_data:
-            self.send_data()
+    if (image.image_pil.width-image.image_pil.height) > (image.image_pil.width+image.image_pil.height)/10: 
+        form = Form(flag=0, w=50, h=15, r=1, c=2, an1='C', an2='W', bb=(1,0,-0.5,1), loc="center left")
+        ans = form + image
+    else: 
+        form = Form(flag=1, w=15, h=50, r=2, c=1, an1='S', an2='N', bb=(0.5,1), loc='lower center')
+        ans = image + form
 
-    def send_data(self):
-        data = self.image.center/255
-        _, counts = np.unique(self.image.label, return_counts=True)
-        self.data = np.hstack((data, counts)).astype('float32')
+    with BytesIO() as output:
+        ans.save(output, 'BMP')
+        result = output.getvalue()
+
+    return result
 
 
 if __name__ == '__main__':
