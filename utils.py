@@ -3,8 +3,7 @@ import numpy as np
 from tqdm import tqdm
 
 
-EPOCHS = 5 #number of epochs
-ITERATIONS = 15 #number of iterations per epoch
+ITERATIONS = 2 #number of iterations
 DEBUG = True #makes some logs if True
 
 def kmeans(data, k):
@@ -53,9 +52,8 @@ def kmeans(data, k):
 	data = data.reshape(-1, 3)
 	centroids = np.random.uniform(0, 256, (k, 3)) #randomly generates centroids
 
-	labels, centroids = iterate(data, centroids)
-
-	print(centroids[:5])
+	for iteration in tqdm(range(ITERATIONS)):
+		labels, centroids = iterate(data, centroids)
 
 	return labels, centroids
 
