@@ -1,9 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt 
-from cv2 import kmeans, KMEANS_RANDOM_CENTERS, TERM_CRITERIA_EPS, TERM_CRITERIA_MAX_ITER
+#from cv2 import kmeans, KMEANS_RANDOM_CENTERS, TERM_CRITERIA_EPS, TERM_CRITERIA_MAX_ITER
 from PIL import Image
 from io import BytesIO
 
+from utils import kmeans
 
 class Picture:
     """A picture object
@@ -64,22 +65,25 @@ class Picture:
             3. move centroid to their new position (mean of assigned colors)
             4. repeat stepts 2 and 3 until sum of distances is minimal
         """
-        _, self.label, self.center = kmeans(
-                    self.image_posterized.reshape(-1, 3).astype('float32'), 
-                    self.k, 
-                    None, 
-                    (TERM_CRITERIA_EPS + TERM_CRITERIA_MAX_ITER, 10, 1), 
-                    0,
-                    KMEANS_RANDOM_CENTERS
-                    )
+        # _, self.label, self.center = kmeans(
+        #             self.image_posterized.reshape(-1, 3).astype('float32'), 
+        #             self.k, 
+        #             None, 
+        #             (TERM_CRITERIA_EPS + TERM_CRITERIA_MAX_ITER, 10, 1), 
+        #             0,
+        #             KMEANS_RANDOM_CENTERS
+        #             )
 
+        self.label, self.center = kmeans(self.image, self.k)
         self.hist = self.get_hist()
 
         if self.PAD:
+            #making a white pad around the image
             pv = max(self.image_pil.width, self.image_pil.height)//85
             self.image_pil = Image.fromarray(np.pad(self.image_pil, ((pv,pv), (pv,pv), (0,0)), 'constant', constant_values=255))
         
     def get_hist(self):
+        #makes histogram of found clusters and returns mostly frequent colors
         (hist, _) = np.histogram(self.label, bins=self.k)
         mask = np.argsort(hist)
         self.center = self.center.reshape(-1, 3)[mask]
@@ -87,12 +91,12 @@ class Picture:
 
     #picture to the left of the form
     def __add__(self, form):
-        assert isinstance(form, Form), 'Should be From object'
+        assert isinstance(form, Form), 'Should be Form object'
         return form.__radd__(self)
     
     #picture over the form
     def __radd__(self, form):
-        assert isinstance(form, Form), 'Should be From object'
+        assert isinstance(form, Form), 'Should be Form object'
         return form.__add__(self)
 
 
@@ -209,7 +213,7 @@ def vegnn(imgb):
 
 if __name__ == '__main__':
     import requests
-    EXTRA_TEST = 'https://pp.userapi.com/c854328/v854328840/24b3a/zB5HXYFdz4I.jpg'
+    EXTRA_TEST = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT1i6jN4Lj2kP2glv4vD3p16chAH6q-V9JpeHYd6URd9-GyoM7reg'
     test = vegnn(requests.get(EXTRA_TEST).content)
-    plt.imshow(np.array(Image.open(BytesIO(test.result))))
+    plt.imshow(np.array(Image.open(BytesIO(test))))
     plt.show()
